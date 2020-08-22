@@ -280,25 +280,40 @@ export class ContextWebGL implements IContextGL
 	}
 
 	private _initBackBuffers(width: number, height: number) {
+		
+		const b0 = new TextureWebGL(this, width, height);
+		const b1 = new TextureWebGL(this, width, height);
+
+		this.initFrameBuffer(b0, 0, 0);
+		this.initFrameBuffer(b1, 0, 0);
+
 		if(this._backBuffers.length) {
+			// copy 
+			this._blitter.blit(
+				this.targetBackBuffer, b0);
+
 			this.disposeTexture(this._backBuffers[0]);
 			this.disposeTexture(this._backBuffers[1]);
 		}
 
-		this._backBuffers[0] = new TextureWebGL(this, width, height);
-		this._backBuffers[1] = new TextureWebGL(this, width, height);
-
-		this.initFrameBuffer(this._backBuffers[0], 0, 0);
-		this.initFrameBuffer(this._backBuffers[1], 0, 0);
+		this._backBuffers = [b0, b1];
 	}
+	
+	/**
+	 * Return last renderd backbuffer texture 
+	 * @param copy - copy result to next frame, required when pass not endings (blendModes)
+	 */
+	public grabBackbufferPass(copy: boolean = false): TextureWebGL {
 
-	private swap() {
-		this.presentFrameBufferTo(
-			this._backBuffers[0], 
-			this._backBuffers[1], 
-			new Rectangle(0,0,this._width, this._height), new Point(0,0));
-
+		if(copy) {
+			this.presentFrameBufferTo(
+				this._backBuffers[0], 
+				this._backBuffers[1], 
+				new Rectangle(0,0,this._width, this._height), new Point(0,0));
+		}
 		this._backBuffers = [this._backBuffers[1], this._backBuffers[0]];
+
+		return this._backBuffers[1];
 	}
 
 	public gl():WebGLRenderingContext
@@ -326,12 +341,15 @@ export class ContextWebGL implements IContextGL
 
 	public configureBackBuffer(width:number, height:number, antiAlias:number, enableDepthAndStencil:boolean = true):void
 	{
-		width = width * this._pixelRatio;
-		height = height * this._pixelRatio;
+		width = width * this._pixelRatio | 0;
+		height = height * this._pixelRatio | 0;
 
 		if(this._width !== width && this._height !== height) {
 			this._initBackBuffers(width, height);
 		}
+
+		this._width = width;
+		this._height = height;
 
 		if (enableDepthAndStencil) {
 			this._gl.enable(this._gl.STENCIL_TEST);
@@ -419,6 +437,9 @@ export class ContextWebGL implements IContextGL
 
 		//this.swap();
 		this._blitter.blit(this._backBuffers[0]);
+		
+		if(this._isRenderToBack)
+			this.setRenderToBackBuffer();
 	}
 
 	public setBlendFactors(sourceFactor:ContextGLBlendFactor, destinationFactor:ContextGLBlendFactor):void
@@ -650,8 +671,7 @@ export class ContextWebGL implements IContextGL
 			this.presentFrameBuffer(this._renderTarget);
 
 		if(this.targetBackBuffer !== target) {
-			console.log("Texture");
-			this.present();
+			//this.present();
 		}
 
 		this._renderTarget = <TextureWebGL> target;
@@ -668,7 +688,7 @@ export class ContextWebGL implements IContextGL
 			this._renderTarget = null;
 		}
 
-		console.log("Back");
+		//console.log("Back");
 
 		//this._gl.bindFramebuffer(this._gl.FRAMEBUFFER, null);
 		this.setRenderToTexture(this.targetBackBuffer, true);
