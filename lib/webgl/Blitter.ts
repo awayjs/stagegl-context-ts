@@ -40,25 +40,25 @@ export class QUAD {
     constructor(gl: ContextWebGL) {
         this.gl = gl;
 
-		this.vtxBuffer = gl.createVertexBuffer(8, 2);
-		this.idxBuffer = gl.createIndexBuffer(6);
+        this.vtxBuffer = gl.createVertexBuffer(8, 2);
+        this.idxBuffer = gl.createIndexBuffer(6);
 
-		this.valid = false;
-	}
+        this.valid = false;
+    }
 
-	upload() {
+    upload() {
         this.vtxBuffer.uploadFromArray(new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]), 0, 8);
         this.idxBuffer.uploadFromArray(new Uint16Array([0, 1, 2, 0, 2, 3]), 0, 6);
 
-		this.valid = true;
-	}
+        this.valid = true;
+    }
 
-	draw() {
+    draw() {
         const gl = this.gl;
-        
+
         gl.setVertexBufferAt(0, this.vtxBuffer);
         gl.drawIndices(ContextGLDrawMode.TRIANGLES, this.idxBuffer);
-	}
+    }
 }
 
 export class Blitter {
@@ -74,10 +74,10 @@ export class Blitter {
         this.prog = this.gl.createProgram();
         this.prog.name = "BLIT_TO_CANVAS";
         this.prog.uploadRaw(VERT, FRAG);
-	}
+    }
 
-	blit(source: TextureWebGL, ) {
-		const gl = this.gl.gl();
+    blit(source: TextureWebGL, ) {
+        const gl = this.gl.gl();
 
         this.gl.disableDepth();
         this.gl.disableStencil();
@@ -86,13 +86,13 @@ export class Blitter {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
         this.gl.setProgram(this.prog);
-        this.gl.setSamplerStateAt(ContextWebGL.MAX_SAMPLERS - 1, 
-            ContextGLWrapMode.CLAMP, 
-            ContextGLTextureFilter.NEAREST, 
+        this.gl.setSamplerStateAt(ContextWebGL.MAX_SAMPLERS - 1,
+            ContextGLWrapMode.CLAMP,
+            ContextGLTextureFilter.NEAREST,
             ContextGLMipFilter.MIPNONE
         );
 
         this.gl.setTextureAt(ContextWebGL.MAX_SAMPLERS - 1, source);
-		this.quad.draw();
-	}
+        this.quad.draw();
+    }
 }
