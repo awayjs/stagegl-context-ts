@@ -24,6 +24,8 @@ import {ProgramWebGL} from "./ProgramWebGL";
 import {TextureBaseWebGL} from "./TextureBaseWebGL";
 import {TextureWebGL} from "./TextureWebGL";
 import {VertexBufferWebGL} from "./VertexBufferWebGL";
+import { ThresholdFilter3D } from '../filters/ThresholdFilter3D';
+import { Blitter } from './Blitter';
 
 var awayDebugDrawing:boolean=false;
 
@@ -82,6 +84,18 @@ export class ContextWebGL implements IContextGL
 	private _glVersion:number;
 	private _renderTarget:TextureWebGL;
 	private _renderTargetConfig: IRendertargetEntry = undefined;
+
+	private _blitter: Blitter;
+	private _isRenderToBack: boolean = true;
+	private _backBuffers: TextureWebGL[] = [];
+
+	public get targetBackBuffer() {
+		return this._backBuffers[0];
+	}
+
+	public get lastBackBuffer() {
+		return this._backBuffers[1];
+	}
 
 	public get glVersion():number
 	{
@@ -260,6 +274,31 @@ export class ContextWebGL implements IContextGL
 			this._samplerStates[i].filter = this._gl.LINEAR;
 			this._samplerStates[i].mipfilter = this._gl.LINEAR;
 		}
+
+		this._blitter = new Blitter(this);
+		this._initBackBuffers(this._gl.drawingBufferWidth, this._gl.drawingBufferHeight);
+	}
+
+	private _initBackBuffers(width: number, height: number) {
+		if(this._backBuffers.length) {
+			this.disposeTexture(this._backBuffers[0]);
+			this.disposeTexture(this._backBuffers[1]);
+		}
+
+		this._backBuffers[0] = new TextureWebGL(this, width, height);
+		this._backBuffers[1] = new TextureWebGL(this, width, height);
+
+		this.initFrameBuffer(this._backBuffers[0], 0, 0);
+		this.initFrameBuffer(this._backBuffers[1], 0, 0);
+	}
+
+	private swap() {
+		this.presentFrameBufferTo(
+			this._backBuffers[0], 
+			this._backBuffers[1], 
+			new Rectangle(0,0,this._width, this._height), new Point(0,0));
+
+		this._backBuffers = [this._backBuffers[1], this._backBuffers[0]];
 	}
 
 	public gl():WebGLRenderingContext
@@ -287,8 +326,12 @@ export class ContextWebGL implements IContextGL
 
 	public configureBackBuffer(width:number, height:number, antiAlias:number, enableDepthAndStencil:boolean = true):void
 	{
-		this._width = width*this._pixelRatio;
-		this._height = height*this._pixelRatio;
+		width = width * this._pixelRatio;
+		height = height * this._pixelRatio;
+
+		if(this._width !== width && this._height !== height) {
+			this._initBackBuffers(width, height);
+		}
 
 		if (enableDepthAndStencil) {
 			this._gl.enable(this._gl.STENCIL_TEST);
@@ -373,6 +416,9 @@ export class ContextWebGL implements IContextGL
 	public present():void
 	{
 		//this._drawing = false;
+
+		//this.swap();
+		this._blitter.blit(this._backBuffers[0]);
 	}
 
 	public setBlendFactors(sourceFactor:ContextGLBlendFactor, destinationFactor:ContextGLBlendFactor):void
@@ -415,6 +461,10 @@ export class ContextWebGL implements IContextGL
 	}
 
 	public setViewport(x: number, y: number, width: number, height: number) {
+		if(this._isRenderToBack) {
+			//this._initBackBuffers(x + width, y + height)
+		}
+
 		this._gl.viewport(x,y,width,height);
 	}
 
@@ -599,9 +649,16 @@ export class ContextWebGL implements IContextGL
 		if (this._renderTarget)
 			this.presentFrameBuffer(this._renderTarget);
 
+		if(this.targetBackBuffer !== target) {
+			console.log("Texture");
+			this.present();
+		}
+
 		this._renderTarget = <TextureWebGL> target;
 		this._renderTargetConfig = {texture: this._renderTarget, enableDepthAndStencil, antiAlias, surfaceSelector, mipmapSelector};
 		this.setFrameBuffer(this._renderTarget, enableDepthAndStencil, antiAlias, surfaceSelector, mipmapSelector);
+
+		this._isRenderToBack = false;
 	}
 
 	public setRenderToBackBuffer():void
@@ -611,8 +668,14 @@ export class ContextWebGL implements IContextGL
 			this._renderTarget = null;
 		}
 
+		console.log("Back");
+
+		//this._gl.bindFramebuffer(this._gl.FRAMEBUFFER, null);
+		this.setRenderToTexture(this.targetBackBuffer, true);
+
+		this._renderTarget = null;
 		this._renderTargetConfig = null;
-		this._gl.bindFramebuffer(this._gl.FRAMEBUFFER, null);
+		this._isRenderToBack = true;
 	}
 
 	public restoreRenderTarget() {
