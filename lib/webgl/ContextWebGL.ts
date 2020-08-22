@@ -298,7 +298,7 @@ export class ContextWebGL implements IContextGL
 
 		this._backBuffers = [b0, b1];
 	}
-	
+
 	/**
 	 * Return last renderd backbuffer texture 
 	 * @param copy - copy result to next frame, required when pass not endings (blendModes)
